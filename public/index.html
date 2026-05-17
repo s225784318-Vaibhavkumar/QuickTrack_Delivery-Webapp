@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuickTrack - Live Delivery Map</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+    <div class="glass-panel dashboard-container">
+        <h2>Live Tracking</h2>
+        
+        <div id="errorArea" class="hidden" style="text-align: center; color: var(--danger); margin-bottom: 1rem;">
+            Invalid or missing tracking session ID.
+        </div>
+
+        <div id="trackingUI" class="hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <span style="color: var(--text-muted); font-size: 0.875rem;">Session: <span id="sessIdDisplay" style="color: var(--text-main);"></span></span>
+                <span class="status-badge" id="customerStatus">Connecting...</span>
+            </div>
+            
+            <!-- Map Container -->
+            <div id="map"></div>
+            
+            <p style="text-align: center; color: var(--text-muted); font-size: 0.875rem;" id="lastUpdated">
+                Waiting for GPS coordinates...
+            </p>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/map.js"></script>
+</body>
+</html>
