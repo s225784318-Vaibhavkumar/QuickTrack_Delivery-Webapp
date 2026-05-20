@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuickTrack - Driver Login</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="glass-panel">
+        <h2>Driver Portal</h2>
+        <form id="loginForm">
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="email" value="driver@test.com" required>
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="password" value="password123" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Login to Dashboard</button>
+            <p id="errorMsg" style="color: var(--danger); margin-top: 1rem; text-align: center; font-size: 0.875rem;" class="hidden"></p>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const errorMsg = document.getElementById('errorMsg');
+
+            try {
+                const res = await fetch('/api/driver/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    localStorage.setItem('driverToken', data.token);
+                    window.location.href = '/driver-dashboard.html';
+                } else {
+                    errorMsg.textContent = data.error;
+                    errorMsg.classList.remove('hidden');
+                }
+            } catch (err) {
+                errorMsg.textContent = 'Server connection failed.';
+                errorMsg.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
