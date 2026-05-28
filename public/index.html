@@ -5,30 +5,75 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QuickTrack - Live Delivery Map</title>
     <link rel="stylesheet" href="/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
-<body>
-    <div class="glass-panel dashboard-container">
-        <h2>Live Tracking</h2>
-        
-        <div id="errorArea" class="hidden" style="text-align: center; color: var(--danger); margin-bottom: 1rem;">
-            Invalid or missing tracking session ID.
-        </div>
+<body class="dark-theme">
+    <!-- WebSocket Connection Status Banner -->
+    <div id="connBanner" class="connection-banner hidden">
+        <span id="connBannerText">⚠️ Connection interrupted. Reconnecting...</span>
+    </div>
 
-        <div id="trackingUI" class="hidden">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <span style="color: var(--text-muted); font-size: 0.875rem;">Session: <span id="sessIdDisplay" style="color: var(--text-main);"></span></span>
-                <span class="status-badge" id="customerStatus">Connecting...</span>
+    <div class="dashboard-wrapper">
+        <header class="app-header">
+            <div class="logo">
+                <span class="icon">📍</span>
+                <h1>QuickTrack <span class="badge">Live Tracking</span></h1>
             </div>
-            
-            <!-- Map Container -->
-            <div id="map"></div>
-            
-            <p style="text-align: center; color: var(--text-muted); font-size: 0.875rem;" id="lastUpdated">
-                Waiting for GPS coordinates...
-            </p>
-        </div>
+            <a href="/driver-login.html" class="btn btn-secondary btn-sm">Driver Portal</a>
+        </header>
+
+        <main class="tracking-grid">
+            <!-- Details Panel -->
+            <section class="glass-panel tracking-details">
+                <h3>Delivery Details</h3>
+
+                <div id="errorArea" class="hidden error-box">
+                    <p>❌ Invalid or missing tracking session ID.</p>
+                    <span class="help-text">Please ensure you are using the exact link provided by your driver.</span>
+                </div>
+
+                <div id="trackingUI" class="hidden tracking-panel">
+                    <div class="session-meta">
+                        <div>
+                            <span class="meta-label">Session ID</span>
+                            <span id="sessIdDisplay" class="meta-value">-</span>
+                        </div>
+                        <span class="status-badge" id="customerStatus">Connecting...</span>
+                    </div>
+
+                    <!-- ETA Engine Card -->
+                    <div class="eta-card glass-panel-inner">
+                        <div class="eta-icon">⏱️</div>
+                        <div class="eta-info">
+                            <span class="card-label">Estimated Delivery Time</span>
+                            <span id="etaTime" class="eta-value">Calculating...</span>
+                            <span id="distanceText" class="distance-value">Estimating distance...</span>
+                        </div>
+                    </div>
+
+                    <!-- Driver / Vehicle Details Card -->
+                    <div class="driver-card glass-panel-inner margin-top">
+                        <div class="driver-avatar">👤</div>
+                        <div class="driver-info">
+                            <span class="card-label">Assigned Courier</span>
+                            <span id="driverName" class="driver-value">Loading...</span>
+                            <span id="vehicleDetails" class="vehicle-value">Loading vehicle...</span>
+                        </div>
+                    </div>
+
+                    <div class="status-footer">
+                        <p id="lastUpdated" class="update-text">Waiting for GPS coordinates...</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Map View Panel -->
+            <section class="map-container-panel">
+                <div id="map"></div>
+            </section>
+        </main>
     </div>
 
     <!-- Leaflet JS -->
