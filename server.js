@@ -7,6 +7,11 @@ const cors = require("cors");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const path = require("path");
+const mongoose = require("mongoose");
+
+// Load Mongoose models
+const Driver = require("./models/Driver");
+const TrackingSession = require("./models/TrackingSession");
 
 const app = express();
 const server = http.createServer(app);
@@ -16,22 +21,48 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
-// In-memory Database for Sprint 1 (MongoDB in Sprint 2)
-const drivers = [];
-const activeSessions = {}; // Map session_id to session details
+// MongoDB Database Connection
+const MONGODB_URI = process.env.MONGODB_URI;
 
-// Initialize mock driver
-const initMockDriver = async () => {
-  const hashedPassword = await bcrypt.hash("password123", 10);
-  drivers.push({
-    id: "driver_001",
-    email: "driver@test.com",
-    password: hashedPassword,
-    name: "John Doe",
-  });
-  console.log("Mock driver created: driver@test.com / password123");
+const connectToDatabase = async () => {
+  if (!MONGODB_URI) {
+    console.error(
+      "Missing MONGODB_URI in .env. Add your MongoDB Atlas connection string before starting the server.",
+    );
+    process.exit(1);
+  }
+
+  try {
+    await mongoose.connect(MONGODB_URI);
+    console.log("Connected to MongoDB database successfully.");
+    await initMockDriver();
+  } catch (err) {
+    console.error("MongoDB connection error:", err.message);
+    process.exit(1);
+  }
 };
-initMockDriver();
+
+// Initialize mock driver if none exist
+const initMockDriver = async () => {
+  try {
+    const existingDriver = await Driver.findOne({ email: "driver@test.com" });
+    if (!existingDriver) {
+      const hashedPassword = await bcrypt.hash("password123", 10);
+      const mockDriver = new Driver({
+        name: "John Doe",
+        email: "driver@test.com",
+        password: hashedPassword,
+        vehicleDetails: "Toyota Prius (White) - Plate: QT-8899",
+      });
+      await mockDriver.save();
+      console.log("Mock driver seeded in DB: driver@test.com / password123");
+    } else {
+      console.log("Mock driver already exists in DB.");
+    }
+  } catch (err) {
+    console.error("Error seeding mock driver:", err);
+  }
+};
 
 // --- Authentication Middleware ---
 const authenticateToken = (req, res, next) => {
@@ -52,69 +83,125 @@ const authenticateToken = (req, res, next) => {
 // US-01: Driver Login API
 app.post("/api/driver/login", async (req, res) => {
   const { email, password } = req.body;
-  const driver = drivers.find((d) => d.email === email);
+  try {
+    const driver = await Driver.findOne({ email });
+    if (!driver) return res.status(401).json({ error: "Invalid credentials" });
 
-  if (!driver) return res.status(401).json({ error: "Invalid credentials" });
+    const validPassword = await bcrypt.compare(password, driver.password);
+    if (!validPassword)
+      return res.status(401).json({ error: "Invalid credentials" });
 
-  const validPassword = await bcrypt.compare(password, driver.password);
-  if (!validPassword)
-    return res.status(401).json({ error: "Invalid credentials" });
+    const token = jwt.sign(
+      { id: driver._id, email: driver.email },
+      process.env.JWT_SECRET,
+      { expiresIn: "8h" },
+    );
+    res.json({ token, driverId: driver._id, name: driver.name, vehicle: driver.vehicleDetails });
+  } catch (err) {
+    res.status(500).json({ error: "Server error during authentication" });
+  }
+});
 
-  const token = jwt.sign(
-    { id: driver.id, email: driver.email },
-    process.env.JWT_SECRET,
-    { expiresIn: "8h" },
-  );
-  res.json({ token, driverId: driver.id, name: driver.name });
+// Get Driver Profile Detail
+app.get("/api/driver/profile", authenticateToken, async (req, res) => {
+  try {
+    const driver = await Driver.findById(req.user.id).select("-password");
+    if (!driver) return res.status(404).json({ error: "Driver not found" });
+    res.json(driver);
+  } catch (err) {
+    res.status(500).json({ error: "Server error fetching profile" });
+  }
+});
+
+// Update Driver Profile
+app.put("/api/driver/profile", authenticateToken, async (req, res) => {
+  const { name, vehicleDetails } = req.body;
+  try {
+    const driver = await Driver.findByIdAndUpdate(
+      req.user.id,
+      { name, vehicleDetails },
+      { new: true }
+    ).select("-password");
+    res.json(driver);
+  } catch (err) {
+    res.status(500).json({ error: "Server error updating profile" });
+  }
 });
 
 // US-02/03: Tracking Session Management
-app.post("/api/tracking/start", authenticateToken, (req, res) => {
+app.post("/api/tracking/start", authenticateToken, async (req, res) => {
   const sessionId = `SESSION_${Date.now()}`;
-  activeSessions[sessionId] = {
-    driverId: req.user.id,
-    status: "In-Transit",
-    startTime: new Date(),
-  };
-  res.json({ sessionId, status: "In-Transit" });
-});
-
-app.post("/api/tracking/stop", authenticateToken, (req, res) => {
-  const { sessionId } = req.body;
-  if (activeSessions[sessionId]) {
-    activeSessions[sessionId].status = "Delivered";
-    activeSessions[sessionId].endTime = new Date();
-    // Broadcast delivered status to anyone listening to this session room
-    io.to(sessionId).emit("delivery_status_update", { status: "Delivered" });
+  try {
+    const session = new TrackingSession({
+      sessionId,
+      driverId: req.user.id,
+      status: "In-Transit",
+      startTime: new Date(),
+    });
+    await session.save();
+    res.json({ sessionId, status: "In-Transit" });
+  } catch (err) {
+    res.status(500).json({ error: "Error starting tracking session" });
   }
-  res.json({ success: true, message: "Tracking stopped" });
 });
 
-app.get("/api/session/:sessionId", (req, res) => {
-  const session = activeSessions[req.params.sessionId];
-  if (!session) return res.status(404).json({ error: "Session not found" });
-  res.json(session);
+app.post("/api/tracking/stop", authenticateToken, async (req, res) => {
+  const { sessionId } = req.body;
+  try {
+    const session = await TrackingSession.findOneAndUpdate(
+      { sessionId },
+      { status: "Delivered", endTime: new Date() },
+      { new: true }
+    );
+    if (session) {
+      io.to(sessionId).emit("delivery_status_update", { status: "Delivered" });
+    }
+    res.json({ success: true, message: "Tracking stopped" });
+  } catch (err) {
+    res.status(500).json({ error: "Error stopping tracking session" });
+  }
 });
 
-// --- WebSocket Setup (US-07) ---
+app.get("/api/session/:sessionId", async (req, res) => {
+  try {
+    const session = await TrackingSession.findOne({ sessionId: req.params.sessionId }).populate("driverId", "name vehicleDetails");
+    if (!session) return res.status(404).json({ error: "Session not found" });
+    res.json(session);
+  } catch (err) {
+    res.status(500).json({ error: "Error fetching session details" });
+  }
+});
+
+// --- WebSocket Setup ---
 io.on("connection", (socket) => {
-  console.log("New client connected:", socket.id);
+  console.log("Client connected:", socket.id);
 
-  // Customer joins a room to listen to a specific delivery
+  // Customer/Driver joins session room
   socket.on("join_session", (sessionId) => {
     socket.join(sessionId);
-    console.log(`Socket ${socket.id} joined session room ${sessionId}`);
+    console.log(`Socket ${socket.id} joined room ${sessionId}`);
   });
 
   // Driver sends location update
-  socket.on("driver_location_update", (data) => {
+  socket.on("driver_location_update", async (data) => {
     const { sessionId, lat, lng } = data;
-    // Broadcast to customers in the session room (US-04)
+    
+    // Broadcast immediately to customers listening (real-time experience)
     io.to(sessionId).emit("location_update", {
       lat,
       lng,
       timestamp: new Date(),
     });
+
+    // Persist coordinates in background to coordinate history array in MongoDB
+    try {
+      await TrackingSession.findOneAndUpdate(
+        { sessionId },
+        { $push: { coordinates: { lat, lng, timestamp: new Date() } } }
+      );
+    } catch (err) {
+      console.error("Error logging coordinates to MongoDB:", err);
+    }
   });
 
   socket.on("disconnect", () => {
@@ -123,6 +210,9 @@ io.on("connection", (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () =>
-  console.log(`Sprint 1 MVP Server running on port ${PORT}`),
-);
+
+connectToDatabase().then(() => {
+  server.listen(PORT, () =>
+    console.log(`Sprint 2 Server running on port ${PORT}`),
+  );
+});
