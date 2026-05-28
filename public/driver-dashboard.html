@@ -5,27 +5,71 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QuickTrack - Driver Dashboard</title>
     <link rel="stylesheet" href="/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body>
-    <div class="glass-panel dashboard-container" style="max-width: 500px;">
-        <h2>Driver Dashboard</h2>
-        
-        <div id="controls">
-            <button id="startBtn" class="btn btn-primary" style="margin-bottom: 1rem;">Start Delivery</button>
-            <button id="stopBtn" class="btn btn-danger hidden">Complete Delivery</button>
-        </div>
+<body class="dark-theme">
+    <!-- WebSocket Connection Status Banner -->
+    <div id="connBanner" class="connection-banner hidden">
+        <span id="connBannerText">⚠️ Connection interrupted. Reconnecting...</span>
+    </div>
 
-        <div id="statusArea" class="hidden" style="margin-top: 1.5rem; text-align: center;">
-            <p>Status: <span class="status-badge" id="statusBadge">Active</span></p>
-            <p style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-muted);">
-                Session ID: <span id="sessionDisplay"></span><br>
-                <span style="color: var(--success);">Broadcasting Location...</span>
-            </p>
-            <div style="margin-top: 1rem; padding: 1rem; background: rgba(0,0,0,0.2); border-radius: 8px;">
-                <p style="font-size: 0.8rem; color: #cbd5e1;">Give this link to the customer:</p>
-                <a id="customerLink" href="#" target="_blank" style="color: var(--primary); font-size: 0.8rem; word-break: break-all;"></a>
+    <div class="dashboard-wrapper">
+        <header class="app-header">
+            <div class="logo">
+                <span class="icon">🚀</span>
+                <h1>QuickTrack <span class="badge">Driver</span></h1>
             </div>
-        </div>
+            <button id="logoutBtn" class="btn btn-secondary btn-sm">Logout</button>
+        </header>
+
+        <main class="dashboard-grid">
+            <!-- Driver Profile Panel -->
+            <section class="glass-panel profile-card">
+                <h3>Driver Profile</h3>
+                <div class="profile-details">
+                    <div class="form-group">
+                        <label for="driverName">Name</label>
+                        <input type="text" id="driverName" class="form-input" placeholder="Loading...">
+                    </div>
+                    <div class="form-group">
+                        <label for="vehicleInfo">Vehicle & Plate Details</label>
+                        <input type="text" id="vehicleInfo" class="form-input" placeholder="Loading...">
+                    </div>
+                    <button id="updateProfileBtn" class="btn btn-secondary btn-block">Save Profile Changes</button>
+                    <p id="profileStatus" class="status-msg hidden"></p>
+                </div>
+            </section>
+
+            <!-- Delivery Controls Panel -->
+            <section class="glass-panel control-card">
+                <h3>Active Delivery Session</h3>
+                
+                <div id="controls" class="control-actions">
+                    <button id="startBtn" class="btn btn-primary btn-lg btn-block">🚀 Start Live Delivery Tracking</button>
+                    <button id="stopBtn" class="btn btn-danger btn-lg btn-block hidden">🛑 Complete & Stop Delivery</button>
+                </div>
+
+                <div id="statusArea" class="status-details hidden">
+                    <div class="status-indicator">
+                        <span class="status-badge" id="statusBadge">Active</span>
+                    </div>
+                    
+                    <div class="session-info">
+                        <p class="label">Session ID</p>
+                        <code id="sessionDisplay">-</code>
+                        
+                        <p class="label margin-top">Broadcast Status</p>
+                        <span class="status-pulse-green">● Streaming Location Live</span>
+                    </div>
+
+                    <div class="customer-link-box">
+                        <p class="link-label">Customer Tracking Link</p>
+                        <a id="customerLink" href="#" target="_blank" class="tracking-link"></a>
+                        <p class="link-help">Copy and send this link to the customer to track in real-time.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
